@@ -1,0 +1,332 @@
+<script type="text/javascript">
+  function getXmlHttp() {
+    var xmlhttp;
+    try {
+      xmlhttp = new ActiveXObject("Msxml2.XMLHTTP");
+    } catch (e) {
+      try {
+        xmlhttp = new ActiveXObject("Microsoft.XMLHTTP");
+      } catch (E) {
+        xmlhttp = false;
+      }
+    }
+    if (!xmlhttp && typeof XMLHttpRequest!='undefined') {
+      xmlhttp = new XMLHttpRequest();
+    }
+    return xmlhttp;
+  }
+  
+var data=[];
+function rpc(command, val) {
+    console.log(command+' : '+JSON.stringify(val));
+	var xmlhttp = getXmlHttp(); 
+    xmlhttp.open('POST', '/rpc/'+command, true); 
+    xmlhttp.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded'); 
+	xmlhttp.send(JSON.stringify(val)); 
+    xmlhttp.onreadystatechange = function() { 
+      if (xmlhttp.readyState == 4) { 
+        if(xmlhttp.status == 200) { 
+        data = JSON.parse(xmlhttp.responseText); 
+		console.log(data); 
+		
+		parse(command,val,data); 	
+		return data;
+         }
+      }
+    };
+  }
+	
+
+	
+function parse(command,val,data){
+  if (data!=="undefined"){
+  	
+	console.log(command); 
+	
+     if (command=="Sys.GetInfo"){
+	
+	    document.getElementById("arch").innerHTML='<b>'+data.arch+'</b>';
+		document.getElementById("ip").innerHTML='<b>'+data.wifi.ssid+'</b> ('+data.wifi.sta_ip+')';
+		document.getElementById("ram_size").innerHTML="ram <b>"+parseInt(data.ram_size/1024, 10)+"</b> kB <b>"+ parseInt(data.ram_free/data.ram_size*100, 10)+"</b>% free";
+		document.getElementById("fs_size").innerHTML="fs <b>"+parseInt(data.fs_size/1024,10)+"</b> kB <b>"+ parseInt(data.fs_free/data.fs_size*100,10)+"</b>% free";
+	
+	 }
+		
+		if (command=="Config.Get"){
+		var buf='<table border="1"  bordercolor="#FBFBFB" cellspacing="0">';
+			
+		for (var key in data) 
+  		{ if (!data.hasOwnProperty(key))
+  		{ continue; }
+		buf+='<tr><td><b>'+key+'</b></td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>';
+		
+		if (typeof(data[key])=="object") {
+		var args=data[key];
+		for (var val in args) {
+		if (typeof(args[val])!="object") {
+		//console.log(typeof(args1[val1]),args1[val1]); 
+		buf+='<tr><td>&nbsp;</td><td><b>'+val+'</b></td><td>&nbsp;</td><td><input type="text" id="'+key+'.'+val+'" value='+JSON.stringify(args[val])+' onchange=update1("'+key+'","'+val+'")  ></td></tr>';
+		}
+		if (typeof(args[val])=="object") {
+		var args1=args[val];
+	
+		for (var val1 in args1) {
+			buf+='<tr><td>&nbsp;</td><td>&nbsp;</td><td>'+val1+'</td><td><input type="text" id="'+key+'.'+val+'.'+val1+'" value='+JSON.stringify(args1[val1])+' onchange=update2("'+key+'","'+val+'","'+val1+'")  ></td></tr>';
+		}
+		}
+		}
+		}
+		}
+		buf+='</table>'
+		document.getElementById('settingsTable').innerHTML=buf;
+	   
+		document.getElementById("enable_sta").checked=data.wifi.sta.enable;
+		document.getElementById("ssid_sta").value=data.wifi.sta.ssid;
+		document.getElementById("pass_sta").value=data.wifi.sta.pass;
+		
+		document.getElementById("enable_ap").checked=data.wifi.ap.enable;
+		document.getElementById("ssid_ap").value=data.wifi.ap.ssid;
+		document.getElementById("pass_ap").value=data.wifi.ap.pass;
+		
+		document.getElementById("enable_mqtt").checked=data.mqtt.enable;
+		document.getElementById("server_mqtt").value=data.mqtt.server;
+		document.getElementById("user_mqtt").value=data.mqtt.user;
+		document.getElementById("pass_mqtt").value=data.mqtt.pass;
+		
+
+
+	   }
+		}
+  
+  
+  
+  
+  
+  
+}	
+
+window.onload = funonload(); 
+
+function funonload(){
+	var command = 'Sys.GetInfo';
+	var val= '{}';
+	val=JSON.parse(val);
+	rpc(command, val);
+	
+	var command = 'Config.Get';
+	var val= '{}';
+	val=JSON.parse(val);
+	rpc(command, val);
+}
+var notice ='';
+function update2(key,val,val1){
+//console.log(key,val,val1);
+var elementVal = document.getElementById(key+'.'+val+'.'+val1).value;
+if (elementVal==''){data[key][val][val1]=''; notice+=key+'-'+val+'-'+val1+' = null \n'; }
+else {
+var num = Number(elementVal) || 'string';
+if (num=='string'){data[key][val][val1]=elementVal; notice+=key+'-'+val+'-'+val1+' = '+elementVal+' \n' ;}
+else {data[key][val][val1]=Number(elementVal); notice+=key+'-'+val+'-'+val1+' = '+Number(elementVal)+' \n';}
+if (elementVal=='true'||elementVal=='false' ){data[key][val][val1]=Boolean(elementVal); notice+=key+'-'+val+'-'+val1+' = '+elementVal+' \n' ;}
+}
+console.log(notice);
+console.log(data);
+}
+function update1(key,val){
+//console.log(key,val);
+var elementVal = document.getElementById(key+'.'+val).value;
+if (elementVal==''){data[key][val]='';notice+=key+'-'+val+' = null \n'; }
+else {
+var num = Number(elementVal) || 'string';
+if (num=='string'){data[key][val]=elementVal; notice+=key+'-'+val+' = '+elementVal+' \n' ;}
+else {data[key][val]=Number(elementVal); notice+=key+'-'+val+' = '+Number(elementVal)+' \n';}
+if (elementVal=='true'||elementVal=='false' ){data[key][val]=Boolean(elementVal); notice+=key+'-'+val+' = '+elementVal+' \n' ;}
+}
+console.log(notice);
+console.log(data);
+}
+
+function save2(command,val){
+var command = 'Config.Set';
+	var val= '{"config":'+ JSON.stringify(data)+ '}';
+	val=JSON.parse(val);
+	console.log(val);
+	rpc(command, val);
+	
+	command = 'Config.Save';
+	val = {"reboot": true};
+	rpc(command, val);
+setTimeout(function(){ funonload() }, 5000);
+}
+function save(command,val){
+var command = 'Config.Set';
+	
+	data.wifi.sta.ssid=document.getElementById("ssid_sta").value;
+	data.wifi.sta.pass=document.getElementById("pass_sta").value
+	data.wifi.sta.enable=document.getElementById("enable_sta").checked;
+	
+	data.wifi.ap.enable=document.getElementById("enable_ap").checked;
+	data.wifi.ap.ssid=document.getElementById("ssid_ap").value;
+	data.wifi.ap.pass=document.getElementById("pass_ap").value;
+	
+	data.mqtt.enable=document.getElementById("enable_mqtt").checked;
+	data.mqtt.server=document.getElementById("server_mqtt").value;
+	data.mqtt.user=document.getElementById("user_mqtt").value;
+	data.mqtt.pass=document.getElementById("pass_mqtt").value;
+	
+	
+	var val= '{"config":'+ JSON.stringify(data)+ '}';
+	val=JSON.parse(val);
+	console.log(val);
+	rpc(command, val);
+	
+	command = 'Config.Save';
+	val = {"reboot": true};
+	rpc(command, val);
+	setTimeout(function(){ funonload() }, 5000);
+}
+
+function wifista() {if ( document.getElementById('enable_sta').checked=true ) {document.getElementById('enable_ap').checked=false}};
+function wifiap() {if ( document.getElementById('enable_ap').checked=true ) {document.getElementById('enable_sta').checked=false}};	
+
+
+</script>
+<html>
+<style>
+
+</style>
+<head>
+<meta name=viewport content="width=device-width, initial-scale=1">
+</head>
+
+<body>
+<header style="width: 100%; height: 90px; position: fixed; left: 0px; top:  0px; _position: absolute; _top: expression( 0 + eval(document.documentElement.scrollTop||document.body.scrollTop) + 'px' );  z-index: 1; background-color:#FBFBFB"">
+      <table  width="100%">
+		<tr>
+			<td><div id="arch"></div></td>
+			<td><font size="3"><div id="fs_size"></div></font></td>
+			
+			<td align="right"><input type="button" value="save" name="B1" ID="B1" onclick="save()"></td>
+		</tr>
+		<tr>
+			<td><font size="3"><div id="ip"></div></font></td>
+			<td><font size="3"><div id="ram_size"></div></font></td>
+		
+			<td align="right"><input  type="button" value="save" name="B2" ID="B2" style='visibility:hidden' onclick="save2()" ></td>
+		</tr>
+		</table><table align="center">
+		<tr><td><a href="" onclick="document.getElementById('layer1').style.visibility = 'hidden'; document.getElementById('layer2').style.visibility = 'visible';document.getElementById('B1').style.visibility = 'hidden'; document.getElementById('B2').style.visibility = 'visible'; return false">Additional settings</a> <a href="" onclick="document.getElementById('layer2').style.visibility = 'hidden'; document.getElementById('layer1').style.visibility = 'visible';document.getElementById('B2').style.visibility = 'hidden'; document.getElementById('B1').style.visibility = 'visible'; return false">Main settings</a></td></tr>
+	</table>
+
+	  
+</header>
+	
+
+	
+	
+
+	
+	
+
+
+
+
+
+
+<div  align="center" style='position:absolute; width:100%; height:100%; top:95px; visibility:visible' id='layer1'>
+
+	<p>&nbsp;</p><p>&nbsp;</p><p>&nbsp;</p>
+	<table border="0"  cellspacing="1">
+	<tr>
+		<td >WIFI STA</td>
+		<td><p><input type="checkbox" id="enable_sta" onclick = "wifista()"></p></td>
+		<td>&nbsp;</td>
+	</tr>
+	<tr>
+		<td >ssid</td>
+		<td ><input type="text" id="ssid_sta"  size="37"></td>
+		<td>&nbsp;</td>
+	</tr>
+	<tr>
+		<td>pass</td>
+		<td><input type="text" id="pass_sta" size="37"></td>
+		<td>&nbsp;</td>
+	</tr>
+	<tr>
+		<td>&nbsp;</td>
+		<td>&nbsp;</td>
+		<td>&nbsp;</td>
+	</tr>
+	<tr>
+		<td >WIFI AP</td>
+		<td><p><input type="checkbox" id="enable_ap" onclick = "wifiap()"></p></td>
+		<td>&nbsp;</td>
+	</tr>
+	<tr>
+		<td >ssid</td>
+		<td ><input type="text" id="ssid_ap" size="37"></td>
+		<td>&nbsp;</td>
+	</tr>
+	<tr>
+		<td>pass</td>
+		<td><input type="text" id="pass_ap" size="37"></td>
+		<td>&nbsp;</td>
+	</tr>
+	<tr>
+		<td>&nbsp;</td>
+		<td>&nbsp;</td>
+		<td>&nbsp;</td>
+	</tr>
+	<tr>
+		<td >MQTT</td>
+		<td><p><input type="checkbox" id="enable_mqtt"></p></td>
+		<td>&nbsp;</td>
+	</tr>
+	<tr>
+		<td >server</td>
+		<td ><input type="text" id="server_mqtt" size="37"></td>
+		<td>&nbsp;</td>
+	</tr>
+	<tr>
+		<td>user</td>
+		<td><input type="text" id="user_mqtt" size="37"></td>
+		<td>&nbsp;</td>
+	</tr>
+	<tr>
+		<td>pass</td>
+		<td><input type="text" id="pass_mqtt" size="37"></td>
+		<td>&nbsp;</td>
+	</tr>
+	<tr>
+		<td>&nbsp;</td>
+		<td>&nbsp;</td>
+		<td>&nbsp;</td>
+	</tr>
+	<tr>
+		<td>&nbsp;</td>
+		<td>&nbsp;</td>
+		<td>&nbsp;</td>
+	</tr>
+	<tr>
+		<td>&nbsp;</td>
+		<td>&nbsp;</td>
+		<td>&nbsp;</td>
+	</tr>
+	
+</table>
+
+</div>
+
+
+
+<p>&nbsp;</p>
+
+<div style='position:absolute; width:100%; height:100%; top:200px; visibility:hidden' id='layer2'>
+
+<div align="center" id="settingsTable"></div>
+
+</div>
+
+</body>
+
+</html>
